@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZipBite - Restaurant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { background: #f5f5f5; }
+    .sidebar { width:220px; position:fixed; top:0; left:0; height:100vh; background:#fff; border-right:1px solid #e5e5e5; z-index:99; box-shadow: 2px 0 8px rgba(0,0,0,0.08); }
+    .sidebar h3 { font-size: 1.4rem; }
+    .nav-link { color: #666; transition: all 0.2s; margin: 0 8px; border-radius: 6px; }
+    .nav-link:hover { background: #f5f5f5; color: #FF6B35; }
+    .nav-link.active { background: #FF6B35 !important; color: #fff !important; }
+    main { margin-left: 220px; padding: 2.5rem; min-height: 100vh; }
+    .btn-success { background: #FF6B35; border-color: #FF6B35; }
+    .btn-success:hover { background: #e55a28; border-color: #e55a28; }
+    .modal-header { border-bottom: 1px solid #e5e5e5; }
+    .table { border-color: #e5e5e5; }
+    .card { border-color: #e5e5e5; border-radius: 10px; }
+    .loading { display: none; text-align: center; padding: 2rem; }
+  </style>
+</head>
+<body>
+<div class="sidebar pt-4 d-none" id="sidebarBox">
+  <div class="px-3 pb-2 fw-bold mb-2" style="color:#FF6B35;font-size:1.4rem;">Restaurant</div>
+  <div class="px-3 mb-4 small text-secondary" id="restInfo">Restaurant name</div>
+  <ul class="nav flex-column">
+    <li class="nav-item"><a class="nav-link active" href="#" onclick="showPage('orders',this)">Orders</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('menu',this)">Menu Items</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('settings',this)">Settings</a></li>
+    <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>
+  </ul>
+</div>
+
+<main class="container py-5" id="mainBox">
+  <!-- LOGIN PAGE -->
+  <div id="page-login" class="d-block">
+    <div class="row">
+      <div class="col-md-4 offset-md-4">
+        <div class="card shadow">
+          <div class="card-body p-4">
+            <h3 class="mb-4 text-center" style="color: #FF6B35;">Restaurant Login</h3>
+            <label class="form-label fw-600">Select Your Restaurant</label>
+            <select class="form-select mb-3" id="restaurantSelect">
+              <option value="">-- Loading restaurants --</option>
+            </select>
+            <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
+            <div class="text-center mt-3 small text-secondary">Demo: Create restaurants in the Admin Panel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORDERS PAGE -->
+  <div id="page-orders" class="d-none">
+    <h3 class="mb-3">Orders</h3>
+    <div id="ordersLoading" class="loading"><div class="spinner-border"></div></div>
+    <div id="ordersTableContainer"></div>
+  </div>
+
+  <!-- MENU PAGE -->
+  <div id="page-menu" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>Menu Items</h3>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#menuModal">+ Add Item</button>
+    </div>
+    <div id="menuLoading" class="loading"><div class="spinner-border"></div></div>
+    <div id="menuTableContainer"></div>
+  </div>
+
+  <!-- SETTINGS PAGE -->
+  <div id="page-settings" class="d-none">
+    <h3 class="mb-3">Settings</h3>
+    <div class="card" style="max-width: 500px;">
+      <div class="card-body">
+        <form onsubmit="saveSettings(event)">
+          <label class="form-label">Restaurant Name</label>
+          <input class="form-control mb-2" id="setName" required>
+          <label class="form-label">Delivery Time (min)</label>
+          <input class="form-control mb-2" id="setDelTime" type="number" required>
+          <label class="form-label">Delivery Fee (₹)</label>
+          <input class="form-control mb-3" id="setDelFee" type="number" required>
+          <button class="btn btn-success" type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- MENU MODAL -->
+<div class="modal fade" id="menuModal"><div class="modal-dialog"><div class="modal-content">
+  <form onsubmit="addMenuItem(event)">
+    <div class="modal-header"><h5 class="modal-title">Add Menu Item</h5>
+      <button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body">
+      <input required class="form-control mb-2" placeholder="Item Name" id="menuName">
+      <input required class="form-control mb-2" placeholder="Category" id="menuCat">
+      <input required class="form-control mb-2" type="number" placeholder="Price" id="menuPrice">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+      <button type="submit" class="btn btn-success">Add</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script src="api-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let currentRestaurant = null;
+  let menu = [];
+  let orders = [];
+
+  function initializePage() {
+    const savedRestId = localStorage.getItem('zipbite_selected_restaurant');
+    if (savedRestId) {
+      const rest = DataManager.getRestaurant(parseInt(savedRestId));
+      if (rest) {
+        currentRestaurant = rest;
+        document.getElementById('page-login').classList.add('d-none');
+        document.getElementById('sidebarBox').classList.remove('d-none');
+        showPage('orders', document.querySelector('.sidebar .nav-link.active'));
+        return;
+      }
+    }
+    loadRestaurantOptions();
+  }
+
+  function loadRestaurantOptions() {
+    const restaurants = DataManager.getRestaurants();
+    const select = document.getElementById('restaurantSelect');
+    if (restaurants.length === 0) {
+      select.innerHTML = '<option value="">No restaurants available. Create one in Admin Panel.</option>';
+      select.disabled = true;
+      document.querySelector('button[onclick="doLogin()"]').disabled = true;
+      return;
+    }
+    select.innerHTML = '<option value="">-- Select a restaurant --</option>' +
+      restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+  }
+
+  function doLogin() {
+    const restId = document.getElementById('restaurantSelect').value;
+    if (!restId) {
+      alert('Please select a restaurant');
+      return;
+    }
+    currentRestaurant = DataManager.getRestaurant(parseInt(restId));
+    if (!currentRestaurant) {
+      alert('Restaurant not found');
+      return;
+    }
+    localStorage.setItem('zipbite_selected_restaurant', restId);
+    document.getElementById('page-login').classList.add('d-none');
+    document.getElementById('sidebarBox').classList.remove('d-none');
+    showPage('orders', document.querySelector('.sidebar .nav-link.active'));
+  }
+
+  function showPage(pg, self) {
+    ['orders','menu','settings'].forEach(p => document.getElementById('page-' + p).classList.add('d-none'));
+    document.getElementById('page-' + pg).classList.remove('d-none');
+    document.querySelectorAll('.sidebar .nav-link').forEach(a => a.classList.remove('active'));
+    if (self) self.classList.add('active');
+    render();
+  }
+
+  function logout() {
+    localStorage.removeItem('zipbite_selected_restaurant');
+    location.reload();
+  }
+
+  function render() {
+    if (!currentRestaurant) return;
+    
+    menu = DataManager.getMenuForRestaurant(currentRestaurant.id);
+    orders = DataManager.getOrders().filter(o => o.restaurantId === currentRestaurant.id);
+    
+    document.getElementById('restInfo').innerText = currentRestaurant.name;
+    
+    // ORDERS
+    let ordersHTML;
+    if (orders.length === 0) ordersHTML = `<div class="alert alert-info">No orders yet.</div>`;
+    else ordersHTML = `
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Items</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+          ${orders.map(o =>
+            `<tr>
+              <td><strong>${o.id}</strong></td>
+              <td>${o.customerName}</td>
+              <td><span class="badge bg-primary">${o.status}</span></td>
+              <td>${o.items?.length || 0}</td>
+              <td>₹${o.total||0}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    document.getElementById('ordersTableContainer').innerHTML = ordersHTML;
+    
+    // MENU
+    let menuHTML;
+    if (menu.length === 0) menuHTML = `<div class="alert alert-info">No menu items yet. Start by adding your first item!</div>`;
+    else menuHTML = `
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          ${menu.map((m) =>
+            `<tr>
+              <td><strong>${m.name}</strong></td>
+              <td><span class="badge bg-light text-dark">${m.category}</span></td>
+              <td>₹${m.price}</td>
+              <td><button class="btn btn-danger btn-sm" onclick="delMenuItem('${m.id}')">Delete</button></td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    document.getElementById('menuTableContainer').innerHTML = menuHTML;
+    
+    // SETTINGS
+    document.getElementById('setName').value = currentRestaurant.name;
+    document.getElementById('setDelTime').value = currentRestaurant.deliveryTime;
+    document.getElementById('setDelFee').value = currentRestaurant.deliveryFee;
+  }
+
+  function addMenuItem(e) {
+    e.preventDefault();
+    if (!currentRestaurant) return;
+    DataManager.addMenuItemToRestaurant(currentRestaurant.id, {
+      name: document.getElementById('menuName').value,
+      category: document.getElementById('menuCat').value,
+      price: parseInt(document.getElementById('menuPrice').value)
+    });
+    document.getElementById('menuName').value = '';
+    document.getElementById('menuCat').value = '';
+    document.getElementById('menuPrice').value = '';
+    bootstrap.Modal.getInstance(document.getElementById('menuModal')).hide();
+    render();
+  }
+
+  function delMenuItem(id) {
+    if (confirm('Delete this item?')) {
+      if (currentRestaurant) {
+        DataManager.deleteMenuItemFromRestaurant(currentRestaurant.id, id);
+        render();
+      }
+    }
+  }
+
+  function saveSettings(e) {
+    e.preventDefault();
+    if (!currentRestaurant) return;
+    const updated = {
+      ...currentRestaurant,
+      name: document.getElementById('setName').value,
+      deliveryTime: parseInt(document.getElementById('setDelTime').value),
+      deliveryFee: parseInt(document.getElementById('setDelFee').value)
+    };
+    const restaurants = DataManager.getRestaurants();
+    const idx = restaurants.findIndex(r => r.id === currentRestaurant.id);
+    if (idx !== -1) {
+      restaurants[idx] = updated;
+      localStorage.setItem('zipbite_restaurants', JSON.stringify(restaurants));
+      currentRestaurant = updated;
+      alert('Settings saved!');
+      render();
+    }
+  }
+
+  initializePage();
+</script>
+</body>
+</html>

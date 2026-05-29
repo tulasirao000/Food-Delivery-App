@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZipBite Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { background: #f7f7f9; }
+    .sidebar {
+      height: 100vh;
+      min-width: 220px;
+      width: 220px;
+      background: #fff; border-right: 1px solid #e5e5e5;
+      position: fixed; top:0; left:0; z-index: 100;
+      padding-top: 28px;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.08);
+    }
+    .sidebar h2 { font-size: 1.4rem; }
+    .sidebar .nav-link { color: #666; transition: all 0.2s; margin: 0 8px; border-radius: 6px; }
+    .sidebar .nav-link:hover { background: #f5f5f5; color: #FF6B35; }
+    .sidebar .nav-link.active { background: #FF6B35; color: #fff !important; }
+    main { margin-left: 220px; min-height: 100vh; padding: 2.5rem 2.5rem; }
+    .stat-card { 
+      background: linear-gradient(135deg, #fff 0%, #fafafa 100%);
+      border: 1px solid #e5e5e5;
+      transition: all 0.25s;
+      border-radius: 10px;
+    }
+    .stat-card:hover { 
+      box-shadow: 0 8px 24px -5px rgba(255, 107, 53, 0.15);
+      transform: translateY(-2px);
+      border-color: #FF6B35;
+    }
+    .stat-card h2 { color: #FF6B35; font-weight: 700; }
+    .modal-header { border-bottom: 1px solid #e5e5e5; }
+    .btn-success { background: #FF6B35; border-color: #FF6B35; }
+    .btn-success:hover { background: #e55a28; border-color: #e55a28; }
+    .table { border-color: #e5e5e5; }
+    .btn-danger { background: #dc3545; }
+    .loading { display: none; text-align: center; padding: 2rem; }
+    .alert-info { background: #e3f2fd; color: #1976d2; }
+  </style>
+</head>
+<body>
+<!-- SIDEBAR -->
+<div class="sidebar pt-4">
+  <div class="px-3 pb-2 fw-bold mb-3" style="color:#FF6B35;font-size:1.4rem;">ZipBite Admin</div>
+  <ul class="nav flex-column">
+    <li class="nav-item"><a class="nav-link active" href="#" onclick="showPage('dashboard',this)">Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('restaurants',this)">Restaurants</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('orders',this)">Orders</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('locations',this)">Locations</a></li>
+  </ul>
+</div>
+
+<main>
+  <!-- DASHBOARD PAGE -->
+  <div id="page-dashboard" class="d-block">
+    <h2 class="mb-4">Dashboard</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card p-4">
+          <h6 class="text-secondary mb-2">Restaurants</h6>
+          <h2 id="stat-rest">0</h2>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card p-4">
+          <h6 class="text-secondary mb-2">Total Orders</h6>
+          <h2 id="stat-order">0</h2>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card p-4">
+          <h6 class="text-secondary mb-2">Menu Items</h6>
+          <h2 id="stat-food">0</h2>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card p-4">
+          <h6 class="text-secondary mb-2">Locations</h6>
+          <h2 id="stat-loc">0</h2>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5 class="mb-3">Recent Orders</h5>
+        <div id="recentOrdersEmpty" class="alert alert-info">No orders yet</div>
+        <table id="recentOrdersTable" class="table table-sm d-none">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESTAURANTS PAGE -->
+  <div id="page-restaurants" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Restaurants</h2>
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#restModal">+ Add Restaurant</button>
+    </div>
+    <div id="restLoading" class="loading"><div class="spinner-border"></div></div>
+    <div id="restaurantsEmpty" class="alert alert-info">No restaurants yet</div>
+    <table id="restaurantsTable" class="table table-hover d-none">
+      <thead>
+        <tr><th>Name</th><th>Cuisine</th><th>Rating</th><th>Time</th><th>Fee</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- ORDERS PAGE -->
+  <div id="page-orders" class="d-none">
+    <h2 class="mb-4">Orders</h2>
+    <div id="ordersLoading" class="loading"><div class="spinner-border"></div></div>
+    <div id="ordersEmpty" class="alert alert-info">No orders yet</div>
+    <table id="ordersTable" class="table table-hover d-none">
+      <thead>
+        <tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Items</th><th>Status</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- LOCATIONS PAGE -->
+  <div id="page-locations" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Locations</h2>
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#locModal">+ Add Location</button>
+    </div>
+    <div id="locationsEmpty" class="alert alert-info">No locations yet</div>
+    <table id="locationsTable" class="table table-hover d-none">
+      <thead>
+        <tr><th>Name</th><th>Area</th><th>Fee</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- RESTAURANT MODAL -->
+<div class="modal fade" id="restModal"><div class="modal-dialog"><div class="modal-content">
+  <form onsubmit="addRestaurant(event)">
+    <div class="modal-header"><h5 class="modal-title">Add Restaurant</h5>
+      <button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body">
+      <input required class="form-control mb-2" placeholder="Restaurant Name" id="restName">
+      <input required class="form-control mb-2" placeholder="Cuisine" id="restCuisine">
+      <input required class="form-control mb-2" type="number" step="0.1" placeholder="Rating" id="restRating">
+      <input required class="form-control mb-2" type="number" placeholder="Delivery Time (min)" id="restTime">
+      <input required class="form-control mb-2" type="number" placeholder="Delivery Fee" id="restFee">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+      <button type="submit" class="btn btn-success">Add</button>
+    </div>
+  </form>
+</div></div></div>
+
+<!-- LOCATION MODAL -->
+<div class="modal fade" id="locModal"><div class="modal-dialog"><div class="modal-content">
+  <form onsubmit="addLocation(event)">
+    <div class="modal-header"><h5 class="modal-title">Add Location</h5>
+      <button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body">
+      <input required class="form-control mb-2" placeholder="Location Name" id="locName">
+      <input required class="form-control mb-2" placeholder="Area" id="locArea">
+      <input required class="form-control mb-2" type="number" placeholder="Delivery Fee" id="locFee">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+      <button type="submit" class="btn btn-success">Add</button>
+    </div>
+  </form>
+</div></div></div>
+
+<script src="api-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let restaurants = [], locations = [], orders = [];
+
+  function showPage(pg, self) {
+    document.querySelectorAll("main > div").forEach(e => e.classList.add("d-none"));
+    document.getElementById(`page-${pg}`).classList.remove("d-none");
+    document.querySelectorAll(".sidebar .nav-link").forEach(e => e.classList.remove("active"));
+    self.classList.add("active");
+    renderAll();
+  }
+
+  async function loadData() {
+    try {
+      restaurants = DataManager.getRestaurants();
+      locations = DataManager.getLocations();
+      orders = DataManager.getOrders();
+    } catch (error) {
+      console.error("[v0] Error loading data:", error);
+    }
+  }
+
+  async function renderAll() {
+    await loadData();
+    
+    // Stats
+    document.getElementById("stat-rest").innerText = restaurants.length;
+    document.getElementById("stat-loc").innerText = locations.length;
+    const foods = restaurants.reduce((acc, r) => acc + (DataManager.getMenuForRestaurant(r.id) || []).length, 0);
+    document.getElementById("stat-food").innerText = foods;
+    document.getElementById("stat-order").innerText = orders.length;
+    
+    // Recent Orders
+    const recentOrders = document.getElementById("recentOrdersTable"), tbody = recentOrders.querySelector("tbody");
+    if (orders.length === 0) {
+      document.getElementById("recentOrdersEmpty").classList.remove("d-none");
+      recentOrders.classList.add("d-none");
+    } else {
+      document.getElementById("recentOrdersEmpty").classList.add("d-none");
+      recentOrders.classList.remove("d-none");
+      tbody.innerHTML = orders.slice(-5).reverse().map(o=>
+        `<tr><td>${o.id}</td><td>₹${o.total||0}</td><td>${o.status}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td></tr>`
+      ).join('');
+    }
+    
+    // Restaurants
+    const restTab = document.getElementById("restaurantsTable"), rtbody = restTab.querySelector("tbody");
+    if (restaurants.length === 0) {
+      document.getElementById("restaurantsEmpty").classList.remove("d-none");
+      restTab.classList.add("d-none");
+    } else {
+      document.getElementById("restaurantsEmpty").classList.add("d-none");
+      restTab.classList.remove("d-none");
+      rtbody.innerHTML = restaurants.map((r) => `
+        <tr>
+          <td><strong>${r.name}</strong></td><td>${r.cuisine}</td><td>${r.rating}</td><td>${r.deliveryTime} min</td><td>₹${r.deliveryFee}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="delRest(${r.id})">Delete</button></td>
+        </tr>
+      `).join('');
+    }
+    
+    // Locations
+    const locTab = document.getElementById("locationsTable"), ltbody = locTab.querySelector("tbody");
+    if (locations.length === 0) {
+      document.getElementById("locationsEmpty").classList.remove("d-none");
+      locTab.classList.add("d-none");
+    } else {
+      document.getElementById("locationsEmpty").classList.add("d-none");
+      locTab.classList.remove("d-none");
+      ltbody.innerHTML = locations.map((l) => `
+        <tr>
+          <td><strong>${l.name}</strong></td><td>${l.area}</td><td>₹${l.fee}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="delLoc(${l.id})">Delete</button></td>
+        </tr>
+      `).join('');
+    }
+    
+    // Orders
+    const ordersTab = document.getElementById("ordersTable"), otbody = ordersTab.querySelector("tbody");
+    if (orders.length === 0) {
+      document.getElementById("ordersEmpty").classList.remove("d-none");
+      ordersTab.classList.add("d-none");
+    } else {
+      document.getElementById("ordersEmpty").classList.add("d-none");
+      ordersTab.classList.remove("d-none");
+      otbody.innerHTML = orders.map(o => `
+        <tr>
+          <td>${o.id}</td>
+          <td>${o.customerName}</td>
+          <td>₹${o.total||0}</td>
+          <td>${o.items?.length || 0} items</td>
+          <td><span class="badge bg-primary">${o.status}</span></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  function delRest(id) {
+    if (confirm("Delete this restaurant?")) {
+      DataManager.deleteRestaurant(id);
+      renderAll();
+    }
+  }
+
+  function delLoc(id) {
+    if (confirm("Delete this location?")) {
+      DataManager.deleteLocation(id);
+      renderAll();
+    }
+  }
+
+  function addRestaurant(e) {
+    e.preventDefault();
+    const r = {
+      name: document.getElementById("restName").value,
+      cuisine: document.getElementById("restCuisine").value,
+      rating: parseFloat(document.getElementById("restRating").value),
+      deliveryTime: parseInt(document.getElementById("restTime").value),
+      deliveryFee: parseInt(document.getElementById("restFee").value)
+    };
+    DataManager.addRestaurant(r);
+    e.target.reset();
+    bootstrap.Modal.getInstance(document.getElementById("restModal")).hide();
+    renderAll();
+  }
+
+  function addLocation(e) {
+    e.preventDefault();
+    DataManager.addLocation({
+      name: document.getElementById("locName").value,
+      area: document.getElementById("locArea").value,
+      fee: parseInt(document.getElementById("locFee").value)
+    });
+    e.target.reset();
+    bootstrap.Modal.getInstance(document.getElementById("locModal")).hide();
+    renderAll();
+  }
+
+  renderAll();
+</script>
+</body>
+</html>
